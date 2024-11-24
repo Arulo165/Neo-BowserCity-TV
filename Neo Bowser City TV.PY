@@ -1,16 +1,60 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QScrollArea, 
                              QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, 
                              QMessageBox, QTextEdit, QPushButton, QLabel,QSpinBox,QCheckBox)
-from PySide6.QtGui import QPainter, QColor, QPixmap
-from PySide6.QtCore import Qt, QRect
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QPainter, QColor, QPixmap, QDrag, QIcon
+from PySide6.QtCore import Qt, QRect, QMimeData, QPoint, QSize, QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtCore import QTimer
 import sys
 import yaml
 import os
 from PIL import Image
 import io
+
+class DraggableButton(QPushButton):
+    def __init__(self, text, frame_index, texture_path, parent=None):
+        super().__init__(text, parent)
+        self.frame_index = frame_index
+        self.texture_path = texture_path
+        self.setAcceptDrops(True)
+        self.setStyleSheet("""
+            QPushButton {
+                padding: 5px;
+                text-align: left;
+                background-color: #000000;
+                color: #ffffff;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #303030;
+            }
+        """)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            drag = QDrag(self)
+            mime_data = QMimeData()
+            mime_data.setText(str(self.frame_index))
+            drag.setMimeData(mime_data)
+            
+            # Optional: Visuelles Feedback während des Dragging
+            pixmap = QPixmap(self.size())
+            self.render(pixmap)
+            drag.setPixmap(pixmap)
+            
+            drag.exec_(Qt.MoveAction)
+        else:
+            super().mousePressEvent(event)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        source_index = int(event.mimeData().text())
+        target_index = self.frame_index
+        self.parent().handle_frame_reorder(source_index, target_index)
+        event.acceptProposedAction()
 
 class TextureButtonWidget(QWidget):
     def __init__(self, parent=None):
@@ -28,27 +72,16 @@ class TextureButtonWidget(QWidget):
         self.buttons.clear()
 
     def add_texture_button(self, texture_path, frame_index):
-        # Erstelle einen Button mit Frame-Index
         button_text = f"Frame {frame_index}: {os.path.basename(texture_path)}"
-        button = QPushButton(button_text)
+        button = DraggableButton(button_text, frame_index, texture_path, self)
         button.setToolTip(texture_path)
-        button.setStyleSheet("""
-            QPushButton {
-                padding: 5px;
-                text-align: left;
-                background-color: #000000;
-                color: #ffffff;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #303030;
-            }
-        """)
-        # Verbinde den Button mit der Anzeigefunktion
         button.clicked.connect(lambda: self.parent.display_texture(texture_path))
         self.layout.addWidget(button)
         self.buttons.append(button)
+
+    def handle_frame_reorder(self, source_index, target_index):
+        # Aktualisiere die Animation Frames im MainWindow
+        self.parent.reorder_animation_frames(source_index, target_index)
 
 class CheckeredWidget(QWidget):
     def __init__(self):
@@ -400,7 +433,6 @@ class MainWindow(QMainWindow):
         if not self.animation_frames:
             return
         
-        # Füge Buttons für jeden Frame in der richtigen Reihenfolge hinzu
         for i, texture_path in enumerate(self.animation_frames):
             self.button_widget.add_texture_button(texture_path, i)
 
@@ -532,6 +564,62 @@ class MainWindow(QMainWindow):
         if self.is_playing:  # Timer läuft
             fps = self.fps_input.value()  # Hole den aktuellen FPS-Wert
             self.animation_timer.start(1000 // fps)  # Aktualisiere den Timer
+
+    def reorder_animation_frames(self, source_index, target_index):
+        if 0 <= source_index < len(self.animation_frames) and 0 <= target_index < len(self.animation_frames):
+            # Verschiebe Frame in der Liste
+            frame = self.animation_frames.pop(source_index)
+            self.animation_frames.insert(target_index, frame)
+            
+            # Aktualisiere die Buttons
+            self.load_textures()
+            
+            # Aktualisiere die YAML-Datei
+            self.update_yaml_with_new_order()
+            
+            # Aktualisiere den Text Editor
+            if self.yaml_content:
+                self.text_editor.setText(self.yaml_content)
+
+    def update_yaml_with_new_order(self):
+        try:
+            data = yaml.safe_load(self.yaml_content)
+            
+            def update_frames_in_data(data_obj):
+                if isinstance(data_obj, dict):
+                    if 'MaterialAnimConfigs' in data_obj:
+                        for material in data_obj['MaterialAnimConfigs']:
+                            if isinstance(material, dict) and 'TexturePatternInfos' in material:
+                                for texture_info in material['TexturePatternInfos']:
+                                    if isinstance(texture_info, dict) and \
+                                    'CurveData' in texture_info and \
+                                    texture_info['CurveData'] and \
+                                    'KeyFrames' in texture_info['CurveData']:
+                                        # Erstelle neue KeyFrames basierend auf der neuen Reihenfolge
+                                        new_frames = {}
+                                        for i, frame in enumerate(self.animation_frames):
+                                            new_frames[str(i)] = frame
+                                        texture_info['CurveData']['KeyFrames'] = new_frames
+                    
+                    for key, value in data_obj.items():
+                        if isinstance(value, (dict, list)):
+                            update_frames_in_data(value)
+                
+                elif isinstance(data_obj, list):
+                    for item in data_obj:
+                        if isinstance(item, (dict, list)):
+                            update_frames_in_data(item)
+
+            update_frames_in_data(data)
+            self.yaml_content = yaml.dump(data, sort_keys=False, allow_unicode=True)
+            
+            # Speichere die Änderungen sofort in die Datei
+            if self.current_file:
+                with open(self.current_file, 'w', encoding='utf-8') as file:
+                    file.write(self.yaml_content)
+                    
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error updating YAML file:\n{str(e)}")
 
 
 
