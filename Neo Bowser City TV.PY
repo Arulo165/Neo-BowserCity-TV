@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QScrollArea, 
                              QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, 
-                             QMessageBox, QTextEdit, QPushButton, QLabel,QSpinBox,QCheckBox)
+                             QMessageBox, QTextEdit, QPushButton, QLabel, QSpinBox, QCheckBox,
+                             QDialog, QLineEdit, QDialogButtonBox)
 from PySide6.QtGui import QPainter, QColor, QPixmap, QDrag, QIcon
 from PySide6.QtCore import Qt, QRect, QMimeData, QPoint, QSize, QTimer
 from PySide6.QtGui import QIcon
@@ -10,12 +11,60 @@ import os
 from PIL import Image
 import io
 
+class AddFrameDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add New Frame")
+        self.setModal(True)
+        
+        layout = QVBoxLayout(self)
+        
+        # Erklärungstext
+        info_label = QLabel("Enter the texture path for the new frame:")
+        layout.addWidget(info_label)
+        
+        # Textfeld für den Texturpfad
+        self.path_input = QLineEdit()
+        layout.addWidget(self.path_input)
+        
+        # Standard Dialog-Buttons (OK & Cancel)
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
 class DraggableButton(QPushButton):
     def __init__(self, text, frame_index, texture_path, parent=None):
         super().__init__(text, parent)
         self.frame_index = frame_index
         self.texture_path = texture_path
         self.setAcceptDrops(True)
+        
+        # Erstelle Layout für Button mit Delete-Icon
+        self.layout = QHBoxLayout()
+        self.layout.setContentsMargins(5, 0, 5, 0)
+        self.layout.setSpacing(5)
+        
+        # Label für den Frame-Text
+        self.text_label = QLabel(text)
+        self.text_label.setStyleSheet("color: white;")
+        self.layout.addWidget(self.text_label)
+        
+        # Stretch zwischen Text und Delete-Button
+        self.layout.addStretch()
+        
+        self.delete_button = QPushButton()
+        self.delete_button.setFixedSize(20, 20)
+        self.delete_button.setIcon(QIcon("Data/Icons/remove.png"))
+        self.delete_button.setIconSize(QSize(20, 20))
+        self.delete_button.setStyleSheet("border: none; background-color: transparent;")
+        self.delete_button.clicked.connect(self.delete_frame)
+        self.layout.addWidget(self.delete_button)
+        
+        self.setLayout(self.layout)
+        
         self.setStyleSheet("""
             QPushButton {
                 padding: 5px;
@@ -30,6 +79,9 @@ class DraggableButton(QPushButton):
             }
         """)
 
+    def delete_frame(self):
+        self.parent().delete_frame(self.frame_index)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             drag = QDrag(self)
@@ -37,7 +89,6 @@ class DraggableButton(QPushButton):
             mime_data.setText(str(self.frame_index))
             drag.setMimeData(mime_data)
             
-            # Optional: Visuelles Feedback während des Dragging
             pixmap = QPixmap(self.size())
             self.render(pixmap)
             drag.setPixmap(pixmap)
@@ -65,6 +116,29 @@ class TextureButtonWidget(QWidget):
         self.buttons = []
         self.parent = parent
 
+        # Füge "Add Frame" Button hinzu
+        self.add_frame_button = QPushButton("+ Add Frame")
+        self.add_frame_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.add_frame_button.clicked.connect(self.show_add_frame_dialog)
+        self.layout.addWidget(self.add_frame_button)
+
+    def show_add_frame_dialog(self):
+        dialog = AddFrameDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            new_texture_path = dialog.path_input.text().strip()
+            if new_texture_path:
+                self.parent.add_new_frame(new_texture_path)
+
     def clear_buttons(self):
         for button in self.buttons:
             self.layout.removeWidget(button)
@@ -76,12 +150,15 @@ class TextureButtonWidget(QWidget):
         button = DraggableButton(button_text, frame_index, texture_path, self)
         button.setToolTip(texture_path)
         button.clicked.connect(lambda: self.parent.display_texture(texture_path))
-        self.layout.addWidget(button)
+        # Füge den Button vor dem "Add Frame" Button ein
+        self.layout.insertWidget(self.layout.count() - 1, button)
         self.buttons.append(button)
 
     def handle_frame_reorder(self, source_index, target_index):
-        # Aktualisiere die Animation Frames im MainWindow
         self.parent.reorder_animation_frames(source_index, target_index)
+
+    def delete_frame(self, frame_index):
+        self.parent.delete_animation_frame(frame_index)
 
 class CheckeredWidget(QWidget):
     def __init__(self):
@@ -613,6 +690,9 @@ class MainWindow(QMainWindow):
             update_frames_in_data(data)
             self.yaml_content = yaml.dump(data, sort_keys=False, allow_unicode=True)
             
+            # Aktualisiere Text Editor
+            self.text_editor.setText(self.yaml_content)
+            
             # Speichere die Änderungen sofort in die Datei
             if self.current_file:
                 with open(self.current_file, 'w', encoding='utf-8') as file:
@@ -620,6 +700,19 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error updating YAML file:\n{str(e)}")
+
+    def add_new_frame(self, texture_path):
+        self.animation_frames.append(texture_path)
+        self.load_textures()
+        self.update_yaml_with_new_order()
+        
+    def delete_animation_frame(self, frame_index):
+        if 0 <= frame_index < len(self.animation_frames):
+            self.animation_frames.pop(frame_index)
+            self.load_textures()
+            self.update_yaml_with_new_order()
+
+
 
 
 
