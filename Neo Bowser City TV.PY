@@ -9,6 +9,8 @@ from PySide6.QtCore import QTimer
 import sys
 import yaml
 import os
+from PIL import Image
+import io
 
 class TextureButtonWidget(QWidget):
     def __init__(self, parent=None):
@@ -25,8 +27,10 @@ class TextureButtonWidget(QWidget):
             button.deleteLater()
         self.buttons.clear()
 
-    def add_texture_button(self, texture_path):
-        button = QPushButton(os.path.basename(texture_path))
+    def add_texture_button(self, texture_path, frame_index):
+        # Erstelle einen Button mit Frame-Index
+        button_text = f"Frame {frame_index}: {os.path.basename(texture_path)}"
+        button = QPushButton(button_text)
         button.setToolTip(texture_path)
         button.setStyleSheet("""
             QPushButton {
@@ -87,6 +91,7 @@ class CheckeredWidget(QWidget):
 
 
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -95,10 +100,12 @@ class MainWindow(QMainWindow):
         
         self.current_file = None
         self.yaml_content = None
-        self.texture_paths = []
-        self.yaml_directory = ""  # Neues Attribut für das YAML-Verzeichnis
+        self.texture_paths = []  # Liste der ursprünglichen Texturpfade
+        self.animation_frames = []  # Neue separate Liste für Animationsframes
+        self.yaml_directory = ""
         self.setup_ui()
         self.create_menu_bar()
+
 
     def setup_ui(self):
         self.main_widget = QWidget()
@@ -243,6 +250,14 @@ class MainWindow(QMainWindow):
         save_all_action.triggered.connect(self.save_yaml_file)
         save_all_action.setShortcut('Ctrl+S')
 
+        # Füge einen Separator hinzu
+        file_menu.addSeparator()
+
+        # Füge Export Animation Option hinzu
+        export_action = file_menu.addAction("Export Animation as GIF...")
+        export_action.triggered.connect(self.export_animation)
+        export_action.setShortcut('Ctrl+E')  # Optional: Füge einen Shortcut hinzu
+
         # Edit Menu
         Edit_menu = menubar.addMenu("Edit")
         
@@ -250,6 +265,73 @@ class MainWindow(QMainWindow):
         self.toggle_editor_action.setShortcut('Ctrl+T')
         self.toggle_editor_action.setCheckable(True)
         self.toggle_editor_action.triggered.connect(self.toggle_editor)
+
+
+    def export_animation(self):
+        if not self.animation_frames:
+            QMessageBox.warning(self, "Error", "No animation frames available to export.\nPlease load a YAML file with texture animations first.")
+            return
+
+        # Dialog zum Speichern der GIF-Datei
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Animation as GIF",
+            "",
+            "GIF Files (*.gif)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            frames = []
+            frame_duration = int(1000 / self.fps_input.value())  # Berechne die Frame-Dauer in Millisekunden
+
+            # Zeige einen Fortschrittsdialog
+            progress = QMessageBox(QMessageBox.Information, "Exporting...", "Creating GIF animation...", QMessageBox.Cancel)
+            progress.setStandardButtons(QMessageBox.NoButton)  # Entferne alle Buttons
+            progress.show()
+            QApplication.processEvents()  # Aktualisiere die UI
+
+            # Sammle alle Frames
+            for texture_path in self.animation_frames:
+                # Konstruiere den vollständigen Pfad
+                full_path = os.path.join(self.yaml_directory, texture_path)
+                
+                # Prüfe verschiedene mögliche Dateierweiterungen
+                possible_extensions = ['', '.png', '.jpg', '.jpeg']
+                for ext in possible_extensions:
+                    test_path = full_path + ext
+                    test_path = os.path.normpath(test_path)
+                    if os.path.exists(test_path):
+                        # Öffne das Bild mit PIL
+                        img = Image.open(test_path)
+                        # Konvertiere zu RGB falls notwendig
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        frames.append(img)
+                        break
+
+            if not frames:
+                progress.close()
+                raise Exception("No valid frames found")
+
+            # Speichere die Animation als GIF
+            frames[0].save(
+                file_path,
+                save_all=True,
+                append_images=frames[1:],
+                duration=frame_duration,
+                loop=0 if self.loops_checkbox.isChecked() else 1
+            )
+
+            # Schließe den Fortschrittsdialog
+            progress.close()
+
+            QMessageBox.information(self, "Success", "Animation successfully exported as GIF!")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error exporting animation:\n{str(e)}")
 
     def toggle_editor(self, checked):
         current_widget = self.content_layout.itemAt(0).widget()
@@ -270,7 +352,8 @@ class MainWindow(QMainWindow):
     def parse_texture_paths(self, yaml_content):
         try:
             data = yaml.safe_load(yaml_content)
-            texture_paths = []
+            animation_frames = []  # Speichere die Frames in der Reihenfolge
+            unique_textures = set()  # Sammle einzigartige Texturen
             
             def extract_texture_paths(data_obj):
                 if isinstance(data_obj, dict):
@@ -286,35 +369,40 @@ class MainWindow(QMainWindow):
                                         frames_dict = {str(k): v for k, v in key_frames.items()}
                                         for value in frames_dict.values():
                                             if isinstance(value, str):
-                                                texture_paths.append(value)
+                                                animation_frames.append(value)
+                                                unique_textures.add(value)
                     
                     for key, value in data_obj.items():
                         if isinstance(key, str) and 'texture' in key.lower() and isinstance(value, str):
-                            texture_paths.append(value)
+                            animation_frames.append(value)
+                            unique_textures.add(value)
                         elif isinstance(value, (dict, list)):
                             extract_texture_paths(value)
                             
                 elif isinstance(data_obj, list):
                     for item in data_obj:
                         if isinstance(item, str):
-                            texture_paths.append(item)
+                            animation_frames.append(item)
+                            unique_textures.add(item)
                         elif isinstance(item, (dict, list)):
                             extract_texture_paths(item)
 
             extract_texture_paths(data)
-            return list(dict.fromkeys(texture_paths))  # Entferne Duplikate
-                
+            return list(unique_textures), animation_frames  # Beide Listen zurückgeben
+
         except Exception as e:
             print(f"Fehler beim Parsen der YAML-Datei: {str(e)}")
-            return []
+            return [], []
+
 
     def load_textures(self):
         self.button_widget.clear_buttons()
-        if not self.texture_paths:
+        if not self.animation_frames:
             return
         
-        for texture_path in self.texture_paths:
-            self.button_widget.add_texture_button(texture_path)
+        # Füge Buttons für jeden Frame in der richtigen Reihenfolge hinzu
+        for i, texture_path in enumerate(self.animation_frames):
+            self.button_widget.add_texture_button(texture_path, i)
 
     def open_yaml_file(self):
         file_name, _ = QFileDialog.getOpenFileName(
@@ -326,7 +414,6 @@ class MainWindow(QMainWindow):
         
         if file_name:
             try:
-                # Speichere das Verzeichnis der YAML-Datei
                 self.yaml_directory = os.path.dirname(os.path.abspath(file_name))
                 
                 with open(file_name, 'r', encoding='utf-8') as file:
@@ -335,16 +422,33 @@ class MainWindow(QMainWindow):
                     self.text_editor.setText(self.yaml_content)
                     self.current_file = file_name
                     
-                    self.texture_paths = self.parse_texture_paths(self.yaml_content)
+                    # Hole beide Listen: einzigartige Texturen und Animationsframes
+                    self.texture_paths, self.animation_frames = self.parse_texture_paths(self.yaml_content)
                     self.load_textures()
 
                     # Zeige den ersten Frame automatisch an
-                    if self.texture_paths:
-                        self.display_texture(self.texture_paths[0])
+                    if self.animation_frames:
+                        self.display_texture(self.animation_frames[0])
                     
                     self.setWindowTitle(f"Neo Bowser City TV - {file_name}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error opening file:\n{str(e)}")
+
+    def next_frame(self):
+        if not self.animation_frames:
+            return
+
+        # Nächsten Frame anzeigen
+        self.current_frame += 1
+        if self.current_frame >= len(self.animation_frames):
+            if self.loops_checkbox.isChecked():
+                self.current_frame = 0
+            else:
+                self.stop_animation()
+                return
+
+        # Zeige den aktuellen Frame
+        self.display_texture(self.animation_frames[self.current_frame])
 
 
     def save_yaml_file(self):
@@ -371,22 +475,6 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error saving file:\n{str(e)}")
 
-    def next_frame(self):
-        if not self.animation_frames:
-            return
-
-        # Nächsten Frame anzeigen
-        self.current_frame += 1
-        if self.current_frame >= len(self.animation_frames):
-            if self.loops_checkbox.isChecked():  # Nur loopen, wenn Checkbox aktiviert ist
-                self.current_frame = 0  # Zurück zum ersten Frame
-            else:
-                self.stop_animation()  # Animation stoppen
-                return
-
-        # Zeige den aktuellen Frame
-        self.display_texture(self.animation_frames[self.current_frame])
-
     def update_animation_loop(self):
         # Optional: Zeige an, ob Loops aktiviert oder deaktiviert wurden
         if self.loops_checkbox.isChecked():
@@ -406,18 +494,20 @@ class MainWindow(QMainWindow):
 
 
     def start_animation(self):
-        if not self.texture_paths:
+        if not self.animation_frames:  # Prüfe animation_frames statt texture_paths
             QMessageBox.warning(self, "Fehler", "Keine Animationen verfügbar.")
             return
 
-        # Extrahiere Frames aus der Texturpfad-Liste
-        self.animation_frames = self.texture_paths  # Reihenfolge hier eventuell anpassen
         self.current_frame = 0  # Starte bei Frame 0
-
+        
         # Timer für FPS-Einstellungen starten
         fps = self.fps_input.value()
         self.animation_timer.start(1000 // fps)
         self.is_playing = True
+        
+        # Zeige den ersten Frame
+        self.display_texture(self.animation_frames[0])
+
 
     def pause_animation(self):
         self.animation_timer.stop()
@@ -434,9 +524,9 @@ class MainWindow(QMainWindow):
 
 
     def update_animation_speed(self):
-        if self.is_playing:  # Timer läuft
-            fps = self.fps_input.value()  # Hole den aktuellen FPS-Wert
-            self.animation_timer.start(1000 // fps)  # Aktualisiere den Timer
+        if self.is_playing:  # Wenn die Animation läuft
+            fps = self.fps_input.value()
+            self.animation_timer.start(1000 // fps)  # Timer-Intervall basierend auf FPS aktualisieren
 
     def update_animation_speed(self):
         if self.is_playing:  # Timer läuft
