@@ -175,8 +175,7 @@ class CheckeredWidget(QWidget):
         if os.path.exists(texture_path):
             self.current_texture = QPixmap(texture_path)
             self.update()
-        else:
-            print(f"Texture not found: {texture_path}")
+
         
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -525,7 +524,7 @@ class MainWindow(QMainWindow):
             return list(unique_textures), animation_frames
 
         except Exception as e:
-            print(f"Error parsing YAML file: {str(e)}")
+            
             return [], []
 
 
@@ -964,11 +963,7 @@ class YAMLPropertyEditor(QWidget):
             self.is_constant_checkbox.setChecked(texture_info.get('IsConstant', False))
             
     def update_yaml(self):
-        parent = self.parent()
-        print(f"Parent type: {type(parent)}")
-        print(f"Parent attributes: {dir(parent)}")
-        
-        # Try using _main_window instead of parent
+
         if hasattr(self._main_window, 'update_yaml'):
             self._main_window.update_yaml()
             
