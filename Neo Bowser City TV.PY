@@ -1,9 +1,10 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QScrollArea, 
                              QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, 
                              QMessageBox, QTextEdit, QPushButton, QLabel, QSpinBox, QCheckBox,
-                             QDialog, QLineEdit, QDialogButtonBox)
+                             QDialog, QLineEdit, QDialogButtonBox, QFormLayout,QListWidgetItem,QListWidget,QGroupBox)
 from PySide6.QtGui import QPainter, QColor, QPixmap, QDrag, QIcon
 from PySide6.QtCore import Qt, QRect, QMimeData, QPoint, QSize, QTimer
+from PySide6.QtWidgets import QFormLayout
 from PySide6.QtGui import QIcon
 import sys
 import yaml
@@ -207,12 +208,15 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Neo Bowser City TV")
         self.resize(1200, 800)
+
+        self.yaml_property_editor = YAMLPropertyEditor(self)
         
         self.current_file = None
         self.yaml_content = None
         self.texture_paths = []  # Liste der ursprünglichen Texturpfade
         self.animation_frames = []  # Neue separate Liste für Animationsframes
         self.yaml_directory = ""
+        self.property_editor = None 
         self.setup_ui()
         self.create_menu_bar()
 
@@ -245,6 +249,8 @@ class MainWindow(QMainWindow):
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.addWidget(self.checkered_widget)
         
+        self.property_editor = YAMLPropertyEditor(self)
+
         # Untere Scroll Area
         self.animation_container = QWidget()
         scroll_area = QScrollArea()
@@ -318,18 +324,27 @@ class MainWindow(QMainWindow):
         self.animation_frames = []
         self.is_playing = False
         
-        
         # Mittleres Layout zusammensetzen
         self.middle_layout.addWidget(self.content_widget)
         self.middle_layout.addWidget(scroll_area)
         self.middle_container.setLayout(self.middle_layout)
+
+        # Rechte YAML Property Editor Area hinzufügen
+        self.yaml_editor = YAMLPropertyEditor(self)
+        right_scroll = QScrollArea()
+        right_scroll.setWidget(self.yaml_editor)
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setMinimumWidth(250)
+        right_scroll.setMaximumWidth(300)
         
         # Hauptlayout zusammensetzen
         main_layout.addWidget(left_scroll)
         main_layout.addWidget(self.middle_container)
+        main_layout.addWidget(right_scroll)
         
         self.main_widget.setLayout(main_layout)
         self.setCentralWidget(self.main_widget)
+
 
     def display_texture(self, relative_texture_path):
         # Prüfe verschiedene mögliche Dateierweiterungen
@@ -461,9 +476,9 @@ class MainWindow(QMainWindow):
 
     def parse_texture_paths(self, yaml_content):
         try:
-            data = yaml.safe_load(yaml_content)
-            animation_frames = []  # Speichere die Frames in der Reihenfolge
-            unique_textures = set()  # Sammle einzigartige Texturen
+            data = yaml.safe_load(yaml_content)  
+            animation_frames = []  # Store frames in order
+            unique_textures = set()  # Collect unique textures
             
             def extract_texture_paths(data_obj):
                 if isinstance(data_obj, dict):
@@ -498,10 +513,19 @@ class MainWindow(QMainWindow):
                             extract_texture_paths(item)
 
             extract_texture_paths(data)
-            return list(unique_textures), animation_frames  # Beide Listen zurückgeben
+            
+            # Update frame count and name in data and yaml content
+            if animation_frames:
+                data['FrameCount'] = len(animation_frames)
+                # Set name from file path if not present
+                if not data.get('Name'):
+                    data['Name'] = os.path.splitext(os.path.basename(self.current_file))[0]
+                self.yaml_content = yaml.dump(data, sort_keys=False, allow_unicode=True)
+                
+            return list(unique_textures), animation_frames
 
         except Exception as e:
-            print(f"Fehler beim Parsen der YAML-Datei: {str(e)}")
+            print(f"Error parsing YAML file: {str(e)}")
             return [], []
 
 
@@ -527,21 +551,57 @@ class MainWindow(QMainWindow):
                 
                 with open(file_name, 'r', encoding='utf-8') as file:
                     self.yaml_content = file.read()
-                    yaml.safe_load(self.yaml_content)
+                    yaml.safe_load(self.yaml_content)  
                     self.text_editor.setText(self.yaml_content)
                     self.current_file = file_name
                     
-                    # Hole beide Listen: einzigartige Texturen und Animationsframes
+                    # Load properties in editor
+                    self.yaml_editor.load_yaml_content(self.yaml_content)
+                    
+                    # Load textures and animation frames
                     self.texture_paths, self.animation_frames = self.parse_texture_paths(self.yaml_content)
                     self.load_textures()
 
-                    # Zeige den ersten Frame automatisch an
                     if self.animation_frames:
                         self.display_texture(self.animation_frames[0])
                     
                     self.setWindowTitle(f"Neo Bowser City TV - {file_name}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error opening file:\n{str(e)}")
+
+    def update_yaml(self):
+        if not self.yaml_content:
+            return
+        
+        
+            
+        # Update basic properties
+        self.yaml_content['Name'] = self.name_edit.text()
+        self.yaml_content['Path'] = None if not self.path_edit.text() else self.path_edit.text()
+        self.yaml_content['Loop'] = self.loop_checkbox.isChecked()
+        self.yaml_content['FrameCount'] = self.frame_count_spin.value()
+        
+        # Update material configs
+        if self.yaml_content.get('MaterialAnimConfigs'):
+            for material in self.yaml_content['MaterialAnimConfigs']:
+                if material.get('TexturePatternInfos'):
+                    material['TexturePatternInfos'][0]['IsConstant'] = self.is_constant_checkbox.isChecked()
+        
+        # Generate YAML content
+        yaml_content = yaml.dump(self.yaml_content, sort_keys=False, allow_unicode=True)
+        
+        # Update text editor
+        if hasattr(self.parent(), 'text_editor'):
+            self.parent().text_editor.setText(yaml_content)
+            
+        # Save to file if exists
+        if hasattr(self.parent(), 'current_file') and self.parent().current_file:
+            try:
+                with open(self.parent().current_file, 'w', encoding='utf-8') as file:
+                    file.write(yaml_content)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error saving file:\n{str(e)}")
+
 
     def next_frame(self):
         if not self.animation_frames:
@@ -712,9 +772,239 @@ class MainWindow(QMainWindow):
             self.load_textures()
             self.update_yaml_with_new_order()
 
+    def update_yaml_with_property_changes(self):
+        try:
+            if not self.yaml_content:
+                return
+
+            # Aktualisierte YAML-Daten generieren
+            updated_yaml_content = yaml.dump(self.yaml_content, sort_keys=False, allow_unicode=True)
+
+            # Änderungen in die Datei schreiben
+            if self.current_file:
+                with open(self.current_file, 'w', encoding='utf-8') as file:
+                    file.write(updated_yaml_content)
+                
+                # YAML-Inhalt aktualisieren
+                self.yaml_content = updated_yaml_content
+                self.text_editor.setText(updated_yaml_content)
+
+               
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Fehler beim Aktualisieren der YAML-Datei:\n{str(e)}")
+
+    def update_yaml(self):
+        try:
+            # Validate core objects exist
+            if not self.yaml_property_editor:
+                print("Error: Property editor not initialized")
+                return
+            
+            # Safe text retrieval
+            current_name = (self.yaml_property_editor.name_edit.text() or '').strip()
+            current_path = (self.yaml_property_editor.path_edit.text() or '').strip()
+            
+            # Ensure YAML content is a dictionary
+            if not isinstance(self.yaml_content, dict):
+                try:
+                    # Convert to dict if not already
+                    self.yaml_content = yaml.safe_load(str(self.yaml_content)) or {}
+                except Exception as parse_error:
+                    print(f"YAML parsing error: {parse_error}")
+                    self.yaml_content = {}
+            
+            # Safe updates with null checks
+            if current_name:
+                self.yaml_content['Name'] = current_name
+            
+            self.yaml_content['Path'] = current_path or None
+            self.yaml_content['Loop'] = self.yaml_property_editor.loop_checkbox.isChecked()
+            self.yaml_content['FrameCount'] = self.yaml_property_editor.frame_count_spin.value()
+            
+            # Safe material config update
+            if self.yaml_content.get('MaterialAnimConfigs'):
+                for material in self.yaml_content['MaterialAnimConfigs']:
+                    if material and material.get('TexturePatternInfos'):
+                        material['TexturePatternInfos'][0]['IsConstant'] = \
+                            self.yaml_property_editor.is_constant_checkbox.isChecked()
+            
+            # Convert to YAML string
+            yaml_content = yaml.dump(self.yaml_content, sort_keys=False, allow_unicode=True)
+            
+            # Trigger update
+            if hasattr(self.yaml_property_editor, 'trigger_yaml_update'):
+                self.yaml_property_editor.trigger_yaml_update()
+        
+        except Exception as e:
+            print(f"Unexpected error in update_yaml: {e}")
 
 
 
+# Property editor
+
+class YAMLPropertyEditor(QWidget):
+    def __init__(self, parent: 'MainWindow' = None):  # Type-Annotation in Anführungszeichen
+        super().__init__(parent)
+        self._main_window: 'MainWindow' = parent  # Explizite Typ-Annotation 
+        self.yaml_content = None
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        
+        # Basic properties group
+        basic_group = QGroupBox("Basic Properties")
+        basic_layout = QFormLayout()
+        
+        self.name_edit = QLineEdit()
+        self.name_edit.textChanged.connect(self.update_yaml)
+        basic_layout.addRow("Name:", self.name_edit)
+        
+        self.path_edit = QLineEdit()
+        self.path_edit.textChanged.connect(self.update_yaml)
+        basic_layout.addRow("Path:", self.path_edit)
+        
+        self.loop_checkbox = QCheckBox()
+        self.loop_checkbox.stateChanged.connect(self.update_yaml)
+        basic_layout.addRow("Loop:", self.loop_checkbox)
+        
+        self.frame_count_spin = QSpinBox()
+        self.frame_count_spin.setRange(1, 9999)
+        self.frame_count_spin.valueChanged.connect(self.update_yaml)
+        basic_layout.addRow("Frame Count:", self.frame_count_spin)
+        
+        basic_group.setLayout(basic_layout)
+        layout.addWidget(basic_group)
+        
+        # Materials group
+        materials_group = QGroupBox("Material Configs")
+        materials_layout = QVBoxLayout()
+        
+        self.materials_list = QListWidget()
+        self.materials_list.currentItemChanged.connect(self.on_material_selected)
+        materials_layout.addWidget(self.materials_list)
+        
+        # Material properties
+        material_form = QFormLayout()
+        self.material_name_edit = QLineEdit()
+        self.material_name_edit.setEnabled(False)
+        self.material_name_edit.textChanged.connect(self.update_material_property)
+        material_form.addRow("Material Name:", self.material_name_edit)
+        
+        # TexturePatternInfo properties
+        self.is_constant_checkbox = QCheckBox()
+        self.is_constant_checkbox.stateChanged.connect(self.update_yaml)
+        material_form.addRow("Is Constant:", self.is_constant_checkbox)
+        
+        materials_layout.addLayout(material_form)
+        materials_group.setLayout(materials_layout)
+        layout.addWidget(materials_group)
+        
+        self.setLayout(layout)
+
+    def load_yaml_content(self, yaml_content):
+        try:
+            self.yaml_content = yaml.safe_load(yaml_content) if yaml_content else {
+                'Name': '',  # Change default to empty string
+                'Path': None,
+                'Loop': False,
+                'FrameCount': 1,
+                'MaterialAnimConfigs': [
+                    {
+                        'Name': '',
+                        'TexturePatternInfos': [
+                            {
+                                'Name': '_a0',
+                                'IsConstant': False,
+                                'ConstantValue': None,
+                                'CurveData': {'KeyFrames': {}}
+                            }
+                        ],
+                        'ParamInfos': []
+                    }
+                ]
+            }
+            self.update_ui_from_yaml()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error loading YAML data:\n{str(e)}")
+
+            
+    def update_ui_from_yaml(self):
+        if not self.yaml_content:
+            return
+        
+        # Use get() with empty string as default to ensure any parsed name is used
+        self.name_edit.setText(self.yaml_content.get('Name', ''))
+
+            
+        # Calculate frame count from animation frames if available
+        if 'MaterialAnimConfigs' in self.yaml_content and self.yaml_content['MaterialAnimConfigs']:
+            for material in self.yaml_content['MaterialAnimConfigs']:
+                if material.get('TexturePatternInfos'):
+                    for texture_info in material['TexturePatternInfos']:
+                        if texture_info.get('CurveData') and texture_info['CurveData'].get('KeyFrames'):
+                            frame_count = len(texture_info['CurveData']['KeyFrames'])
+                            self.frame_count_spin.setValue(frame_count)
+                            self.yaml_content['FrameCount'] = frame_count
+                            break
+        
+        self.name_edit.setText(self.yaml_content.get('Name', 'walk'))
+        self.path_edit.setText(str(self.yaml_content.get('Path', '')))
+        self.loop_checkbox.setChecked(self.yaml_content.get('Loop', False))
+        
+        self.materials_list.clear()
+        materials = self.yaml_content.get('MaterialAnimConfigs', [])
+        for material in materials:
+            item = QListWidgetItem(material.get('Name', ''))
+            item.setData(Qt.UserRole, material)
+            self.materials_list.addItem(item)
+            
+        if materials and materials[0].get('TexturePatternInfos'):
+            texture_info = materials[0]['TexturePatternInfos'][0]
+            self.is_constant_checkbox.setChecked(texture_info.get('IsConstant', False))
+            
+    def update_yaml(self):
+        parent = self.parent()
+        print(f"Parent type: {type(parent)}")
+        print(f"Parent attributes: {dir(parent)}")
+        
+        # Try using _main_window instead of parent
+        if hasattr(self._main_window, 'update_yaml'):
+            self._main_window.update_yaml()
+            
+    def update_material_property(self):
+        current_item = self.materials_list.currentItem()
+        if not current_item:
+            return
+            
+        material_data = current_item.data(Qt.UserRole)
+        material_data['Name'] = self.material_name_edit.text()
+        current_item.setText(material_data['Name'])
+        self.update_yaml()
+        
+    def on_material_selected(self, current, previous):
+        if not current:
+            self.material_name_edit.setEnabled(False)
+            return
+        
+        material_data = current.data(Qt.UserRole)
+        self.material_name_edit.setText(material_data.get('Name', ''))
+        self.material_name_edit.setEnabled(True)
+
+    def trigger_yaml_update(self):
+        parent = self.parent()
+        if hasattr(parent, 'update_yaml_with_property_changes'):
+            self._main_window.update_yaml_with_property_changes()
+
+    def update_material_property(self):
+        current_item = self.materials_list.currentItem()
+        if not current_item:
+            return
+        
+        # Existing update logic...
+        
+        # Call the new trigger method
+        self.trigger_yaml_update()
 
 
 
