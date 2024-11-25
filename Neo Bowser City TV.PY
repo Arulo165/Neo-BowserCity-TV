@@ -94,7 +94,7 @@ class DraggableButton(QPushButton):
             self.render(pixmap)
             drag.setPixmap(pixmap)
             
-            drag.exec_(Qt.MoveAction)
+            drag.exec(Qt.MoveAction)
         else:
             super().mousePressEvent(event)
 
@@ -135,7 +135,7 @@ class TextureButtonWidget(QWidget):
 
     def show_add_frame_dialog(self):
         dialog = AddFrameDialog(self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.Accepted:
             new_texture_path = dialog.path_input.text().strip()
             if new_texture_path:
                 self.parent.add_new_frame(new_texture_path)
@@ -370,7 +370,7 @@ class MainWindow(QMainWindow):
         open_file_action.triggered.connect(self.open_yaml_file)
         open_file_action.setShortcut('Ctrl+O')
         
-        save_all_action = file_menu.addAction("Generate yaml File")
+        save_all_action = file_menu.addAction("save yaml File")
         save_all_action.triggered.connect(self.save_yaml_file)
         save_all_action.setShortcut('Ctrl+S')
 
@@ -639,6 +639,8 @@ class MainWindow(QMainWindow):
                 
                 self.texture_paths = self.parse_texture_paths(yaml_content)
                 self.load_textures()
+                QMessageBox.information(None, "Message", "yaml saved succesfully")
+
                 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error saving file:\n{str(e)}")
