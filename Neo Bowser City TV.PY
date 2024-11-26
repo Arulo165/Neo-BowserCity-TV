@@ -998,9 +998,7 @@ class YAMLPropertyEditor(QWidget):
         if not current_item:
             return
         
-        # Existing update logic...
-        
-        # Call the new trigger method
+       
         self.trigger_yaml_update()
 
 
