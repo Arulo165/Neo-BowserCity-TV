@@ -20,15 +20,15 @@ class AddFrameDialog(QDialog):
         
         layout = QVBoxLayout(self)
         
-        # Erklärungstext
+       
         info_label = QLabel("Enter the texture path for the new frame:")
         layout.addWidget(info_label)
         
-        # Textfeld für den Texturpfad
+       
         self.path_input = QLineEdit()
         layout.addWidget(self.path_input)
         
-        # Standard Dialog-Buttons (OK & Cancel)
+        
         button_box = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
@@ -43,17 +43,17 @@ class DraggableButton(QPushButton):
         self.texture_path = texture_path
         self.setAcceptDrops(True)
         
-        # Erstelle Layout für Button mit Delete-Icon
+        
         self.layout = QHBoxLayout()
         self.layout.setContentsMargins(5, 0, 5, 0)
         self.layout.setSpacing(5)
         
-        # Label für den Frame-Text
+        
         self.text_label = QLabel(text)
         self.text_label.setStyleSheet("color: white;")
         self.layout.addWidget(self.text_label)
         
-        # Stretch zwischen Text und Delete-Button
+
         self.layout.addStretch()
         
         self.delete_button = QPushButton()
@@ -117,7 +117,7 @@ class TextureButtonWidget(QWidget):
         self.buttons = []
         self.parent = parent
 
-        # Füge "Add Frame" Button hinzu
+        
         self.add_frame_button = QPushButton("+ Add Frame")
         self.add_frame_button.setStyleSheet("""
             QPushButton {
@@ -151,7 +151,7 @@ class TextureButtonWidget(QWidget):
         button = DraggableButton(button_text, frame_index, texture_path, self)
         button.setToolTip(texture_path)
         button.clicked.connect(lambda: self.parent.display_texture(texture_path))
-        # Füge den Button vor dem "Add Frame" Button ein
+        
         self.layout.insertWidget(self.layout.count() - 1, button)
         self.buttons.append(button)
 
@@ -181,21 +181,21 @@ class CheckeredWidget(QWidget):
         painter = QPainter(self)
         square_size = 16
         
-        # Zeichne den karierten Hintergrund
+       
         for i in range(0, self.width(), square_size):
             for j in range(0, self.height(), square_size):
                 if (i // square_size + j // square_size) % 2 == 0:
                     painter.fillRect(i, j, square_size, square_size, QColor("#CCCCCC"))
         
-        # Zeichne die Textur, wenn eine geladen ist
+   
         if self.current_texture and not self.current_texture.isNull():
-            # Berechne die Position zum Zentrieren der Textur
+ 
             scaled_width = self.current_texture.width() * self.zoom_level
             scaled_height = self.current_texture.height() * self.zoom_level
             x = (self.width() - scaled_width) / 2
             y = (self.height() - scaled_height) / 2
             
-            # Zeichne die Textur
+          
             target_rect = QRect(int(x), int(y), int(scaled_width), int(scaled_height))
             painter.drawPixmap(target_rect, self.current_texture)
 
@@ -212,8 +212,8 @@ class MainWindow(QMainWindow):
         
         self.current_file = None
         self.yaml_content = None
-        self.texture_paths = []  # Liste der ursprünglichen Texturpfade
-        self.animation_frames = []  # Neue separate Liste für Animationsframes
+        self.texture_paths = []  
+        self.animation_frames = []  
         self.yaml_directory = ""
         self.property_editor = None 
         self.setup_ui()
@@ -224,7 +224,7 @@ class MainWindow(QMainWindow):
         self.main_widget = QWidget()
         main_layout = QHBoxLayout()
         
-        # Linke Scroll Area mit Buttons
+ 
         left_scroll = QScrollArea()
         self.button_widget = TextureButtonWidget(self)
         left_scroll.setWidget(self.button_widget)
@@ -232,17 +232,17 @@ class MainWindow(QMainWindow):
         left_scroll.setMinimumWidth(200)
         left_scroll.setMaximumWidth(200)
         
-        # Mittlerer Container
+    
         self.middle_container = QWidget()
         self.middle_layout = QVBoxLayout()
         self.middle_layout.setSpacing(0)
         self.middle_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Kariertes Widget und Text Editor
+
         self.checkered_widget = CheckeredWidget()
         self.text_editor = QTextEdit()
         
-        # Content Widget für die Mitte
+
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(0, 0, 0, 0)
@@ -250,19 +250,19 @@ class MainWindow(QMainWindow):
         
         self.property_editor = YAMLPropertyEditor(self)
 
-        # Untere Scroll Area
+
         self.animation_container = QWidget()
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setMinimumHeight(100)
         scroll_area.setMaximumHeight(200)
         
-        # Create animation controls
+        
         self.animation_controls = QWidget()
         controls_layout = QHBoxLayout()
         controls_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         
-        # Play Button
+    
         self.play_button = QPushButton()
         self.play_button.setIcon(QIcon("Data/icons/play.png"))
         self.play_button.setIconSize(QSize(20, 20))
@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
         self.play_button.clicked.connect(self.toggle_animation)
         controls_layout.addWidget(self.play_button)
         
-        # Stop Button
+        
         self.stop_button = QPushButton()
         self.stop_button.setIcon(QIcon("Data/icons/stop.png"))
         self.stop_button.setIconSize(QSize(20, 20))
@@ -278,7 +278,7 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self.stop_animation)
         controls_layout.addWidget(self.stop_button)
         
-        # FPS Controls
+       
         fps_label = QLabel("FPS:")
         fps_label.setAlignment(Qt.AlignCenter)
         controls_layout.addWidget(fps_label)
@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         self.fps_input.valueChanged.connect(self.update_animation_speed)
         controls_layout.addWidget(self.fps_input)
         
-        # Loops Checkbox
+        
         self.loops_checkbox = QCheckBox("Loops")
         self.loops_checkbox.setChecked(False)
         self.loops_checkbox.stateChanged.connect(self.update_animation_loop)
@@ -299,11 +299,11 @@ class MainWindow(QMainWindow):
         
         self.animation_controls.setLayout(controls_layout)
         
-        # Main layout for animation area
+        
         animation_layout = QVBoxLayout(self.animation_container)
         animation_layout.addWidget(self.animation_controls)
         
-        # Create timeline widget
+        
         self.timeline_widget = QWidget()
         self.timeline_widget.setMinimumHeight(100)
         self.timeline_widget.setStyleSheet("""
@@ -316,19 +316,19 @@ class MainWindow(QMainWindow):
         
         scroll_area.setWidget(self.animation_container)
         
-        # Initialize animation variables
+        
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.next_frame)
         self.current_frame = 0
         self.animation_frames = []
         self.is_playing = False
         
-        # Mittleres Layout zusammensetzen
+        
         self.middle_layout.addWidget(self.content_widget)
         self.middle_layout.addWidget(scroll_area)
         self.middle_container.setLayout(self.middle_layout)
 
-        # Rechte YAML Property Editor Area hinzufügen
+
         self.yaml_editor = YAMLPropertyEditor(self)
         right_scroll = QScrollArea()
         right_scroll.setWidget(self.yaml_editor)
@@ -336,7 +336,7 @@ class MainWindow(QMainWindow):
         right_scroll.setMinimumWidth(250)
         right_scroll.setMaximumWidth(300)
         
-        # Hauptlayout zusammensetzen
+   
         main_layout.addWidget(left_scroll)
         main_layout.addWidget(self.middle_container)
         main_layout.addWidget(right_scroll)
@@ -346,7 +346,6 @@ class MainWindow(QMainWindow):
 
 
     def display_texture(self, relative_texture_path):
-        # Prüfe verschiedene mögliche Dateierweiterungen
         possible_extensions = ['', '.png', '.jpg', '.jpeg']
         base_path = os.path.join(self.yaml_directory, relative_texture_path)
         
@@ -357,13 +356,13 @@ class MainWindow(QMainWindow):
                 self.checkered_widget.set_texture(test_path)
                 return
                 
-        # Wenn keine Datei gefunden wurde
+        
         QMessageBox.warning(self, "Fehler", f"Textur nicht gefunden: {relative_texture_path}")
 
     def create_menu_bar(self):
         menubar = self.menuBar()
         
-        # File Menu
+       
         file_menu = menubar.addMenu("File")
         
         open_file_action = file_menu.addAction("Open File")
@@ -374,15 +373,15 @@ class MainWindow(QMainWindow):
         save_all_action.triggered.connect(self.save_yaml_file)
         save_all_action.setShortcut('Ctrl+S')
 
-        # Füge einen Separator hinzu
+       
         file_menu.addSeparator()
 
-        # Füge Export Animation Option hinzu
+      
         export_action = file_menu.addAction("Export Animation as GIF...")
         export_action.triggered.connect(self.export_animation)
-        export_action.setShortcut('Ctrl+E')  # Optional: Füge einen Shortcut hinzu
+        export_action.setShortcut('Ctrl+E')  
 
-        # Edit Menu
+       
         Edit_menu = menubar.addMenu("Edit")
         
         self.toggle_editor_action = Edit_menu.addAction("Text Editor")
@@ -396,7 +395,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "No animation frames available to export.\nPlease load a YAML file with texture animations first.")
             return
 
-        # Dialog zum Speichern der GIF-Datei
+     
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Export Animation as GIF",
@@ -409,28 +408,28 @@ class MainWindow(QMainWindow):
 
         try:
             frames = []
-            frame_duration = int(1000 / self.fps_input.value())  # Berechne die Frame-Dauer in Millisekunden
+            frame_duration = int(1000 / self.fps_input.value()) 
 
-            # Zeige einen Fortschrittsdialog
+            
             progress = QMessageBox(QMessageBox.Information, "Exporting...", "Creating GIF animation...", QMessageBox.Cancel)
-            progress.setStandardButtons(QMessageBox.NoButton)  # Entferne alle Buttons
+            progress.setStandardButtons(QMessageBox.NoButton)  
             progress.show()
-            QApplication.processEvents()  # Aktualisiere die UI
+            QApplication.processEvents()  
 
-            # Sammle alle Frames
+            
             for texture_path in self.animation_frames:
-                # Konstruiere den vollständigen Pfad
+              
                 full_path = os.path.join(self.yaml_directory, texture_path)
                 
-                # Prüfe verschiedene mögliche Dateierweiterungen
+              
                 possible_extensions = ['', '.png', '.jpg', '.jpeg']
                 for ext in possible_extensions:
                     test_path = full_path + ext
                     test_path = os.path.normpath(test_path)
                     if os.path.exists(test_path):
-                        # Öffne das Bild mit PIL
+                       
                         img = Image.open(test_path)
-                        # Konvertiere zu RGB falls notwendig
+                       
                         if img.mode != 'RGB':
                             img = img.convert('RGB')
                         frames.append(img)
@@ -440,7 +439,7 @@ class MainWindow(QMainWindow):
                 progress.close()
                 raise Exception("No valid frames found")
 
-            # Speichere die Animation als GIF
+           
             frames[0].save(
                 file_path,
                 save_all=True,
@@ -449,7 +448,7 @@ class MainWindow(QMainWindow):
                 loop=0 if self.loops_checkbox.isChecked() else 1
             )
 
-            # Schließe den Fortschrittsdialog
+            
             progress.close()
 
             QMessageBox.information(self, "Success", "Animation successfully exported as GIF!")
@@ -476,8 +475,8 @@ class MainWindow(QMainWindow):
     def parse_texture_paths(self, yaml_content):
         try:
             data = yaml.safe_load(yaml_content)  
-            animation_frames = []  # Store frames in order
-            unique_textures = set()  # Collect unique textures
+            animation_frames = []  
+            unique_textures = set()  
             
             def extract_texture_paths(data_obj):
                 if isinstance(data_obj, dict):
@@ -513,10 +512,10 @@ class MainWindow(QMainWindow):
 
             extract_texture_paths(data)
             
-            # Update frame count and name in data and yaml content
+           
             if animation_frames:
                 data['FrameCount'] = len(animation_frames)
-                # Set name from file path if not present
+      
                 if not data.get('Name'):
                     data['Name'] = os.path.splitext(os.path.basename(self.current_file))[0]
                 self.yaml_content = yaml.dump(data, sort_keys=False, allow_unicode=True)
@@ -554,10 +553,10 @@ class MainWindow(QMainWindow):
                     self.text_editor.setText(self.yaml_content)
                     self.current_file = file_name
                     
-                    # Load properties in editor
+          
                     self.yaml_editor.load_yaml_content(self.yaml_content)
                     
-                    # Load textures and animation frames
+                    
                     self.texture_paths, self.animation_frames = self.parse_texture_paths(self.yaml_content)
                     self.load_textures()
 
@@ -574,26 +573,25 @@ class MainWindow(QMainWindow):
         
         
             
-        # Update basic properties
+       
         self.yaml_content['Name'] = self.name_edit.text()
         self.yaml_content['Path'] = None if not self.path_edit.text() else self.path_edit.text()
         self.yaml_content['Loop'] = self.loop_checkbox.isChecked()
         self.yaml_content['FrameCount'] = self.frame_count_spin.value()
         
-        # Update material configs
+       
         if self.yaml_content.get('MaterialAnimConfigs'):
             for material in self.yaml_content['MaterialAnimConfigs']:
                 if material.get('TexturePatternInfos'):
                     material['TexturePatternInfos'][0]['IsConstant'] = self.is_constant_checkbox.isChecked()
         
-        # Generate YAML content
         yaml_content = yaml.dump(self.yaml_content, sort_keys=False, allow_unicode=True)
         
-        # Update text editor
+        
         if hasattr(self.parent(), 'text_editor'):
             self.parent().text_editor.setText(yaml_content)
             
-        # Save to file if exists
+        
         if hasattr(self.parent(), 'current_file') and self.parent().current_file:
             try:
                 with open(self.parent().current_file, 'w', encoding='utf-8') as file:
@@ -606,7 +604,7 @@ class MainWindow(QMainWindow):
         if not self.animation_frames:
             return
 
-        # Nächsten Frame anzeigen
+        
         self.current_frame += 1
         if self.current_frame >= len(self.animation_frames):
             if self.loops_checkbox.isChecked():
@@ -615,7 +613,7 @@ class MainWindow(QMainWindow):
                 self.stop_animation()
                 return
 
-        # Zeige den aktuellen Frame
+        
         self.display_texture(self.animation_frames[self.current_frame])
 
 
@@ -646,7 +644,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Error saving file:\n{str(e)}")
 
     def update_animation_loop(self):
-        # Optional: Zeige an, ob Loops aktiviert oder deaktiviert wurden
+   
         if self.loops_checkbox.isChecked():
             print("Loop aktiviert")
         else:
@@ -655,10 +653,10 @@ class MainWindow(QMainWindow):
 
 
     def toggle_animation(self):
-        if self.is_playing:  # Läuft -> Pausieren
+        if self.is_playing:  
             self.pause_animation()
             self.play_button.setIcon(QIcon("Data/icons/play.png"))
-        else:  # Gestoppt oder pausiert -> Starten
+        else: 
             self.start_animation()
             self.play_button.setIcon(QIcon("Data/icons/pause.png"))
 
@@ -670,12 +668,12 @@ class MainWindow(QMainWindow):
 
         self.current_frame = 0  # Starte bei Frame 0
         
-        # Timer für FPS-Einstellungen starten
+        
         fps = self.fps_input.value()
         self.animation_timer.start(1000 // fps)
         self.is_playing = True
         
-        # Zeige den ersten Frame
+        
         self.display_texture(self.animation_frames[0])
 
 
@@ -686,36 +684,36 @@ class MainWindow(QMainWindow):
     def stop_animation(self):
         self.animation_timer.stop()
         self.is_playing = False
-        self.current_frame = 0  # Zurück zum ersten Frame
+        self.current_frame = 0  
         self.play_button.setIcon(QIcon("Data/icons/play.png"))
 
         if self.animation_frames:
-            self.display_texture(self.animation_frames[0])  # Zeige den ersten Frame
+            self.display_texture(self.animation_frames[0])  
 
 
     def update_animation_speed(self):
-        if self.is_playing:  # Wenn die Animation läuft
+        if self.is_playing:  
             fps = self.fps_input.value()
-            self.animation_timer.start(1000 // fps)  # Timer-Intervall basierend auf FPS aktualisieren
+            self.animation_timer.start(1000 // fps) 
 
     def update_animation_speed(self):
-        if self.is_playing:  # Timer läuft
-            fps = self.fps_input.value()  # Hole den aktuellen FPS-Wert
-            self.animation_timer.start(1000 // fps)  # Aktualisiere den Timer
+        if self.is_playing:  
+            fps = self.fps_input.value() 
+            self.animation_timer.start(1000 // fps) 
 
     def reorder_animation_frames(self, source_index, target_index):
         if 0 <= source_index < len(self.animation_frames) and 0 <= target_index < len(self.animation_frames):
-            # Verschiebe Frame in der Liste
+            
             frame = self.animation_frames.pop(source_index)
             self.animation_frames.insert(target_index, frame)
             
-            # Aktualisiere die Buttons
+            
             self.load_textures()
             
-            # Aktualisiere die YAML-Datei
+         
             self.update_yaml_with_new_order()
             
-            # Aktualisiere den Text Editor
+            
             if self.yaml_content:
                 self.text_editor.setText(self.yaml_content)
 
@@ -733,7 +731,7 @@ class MainWindow(QMainWindow):
                                     'CurveData' in texture_info and \
                                     texture_info['CurveData'] and \
                                     'KeyFrames' in texture_info['CurveData']:
-                                        # Erstelle neue KeyFrames basierend auf der neuen Reihenfolge
+                                        
                                         new_frames = {}
                                         for i, frame in enumerate(self.animation_frames):
                                             new_frames[str(i)] = frame
@@ -751,10 +749,10 @@ class MainWindow(QMainWindow):
             update_frames_in_data(data)
             self.yaml_content = yaml.dump(data, sort_keys=False, allow_unicode=True)
             
-            # Aktualisiere Text Editor
+            
             self.text_editor.setText(self.yaml_content)
             
-            # Speichere die Änderungen sofort in die Datei
+            
             if self.current_file:
                 with open(self.current_file, 'w', encoding='utf-8') as file:
                     file.write(self.yaml_content)
@@ -778,15 +776,15 @@ class MainWindow(QMainWindow):
             if not self.yaml_content:
                 return
 
-            # Aktualisierte YAML-Daten generieren
+         
             updated_yaml_content = yaml.dump(self.yaml_content, sort_keys=False, allow_unicode=True)
 
-            # Änderungen in die Datei schreiben
+            
             if self.current_file:
                 with open(self.current_file, 'w', encoding='utf-8') as file:
                     file.write(updated_yaml_content)
                 
-                # YAML-Inhalt aktualisieren
+                
                 self.yaml_content = updated_yaml_content
                 self.text_editor.setText(updated_yaml_content)
 
@@ -796,25 +794,24 @@ class MainWindow(QMainWindow):
 
     def update_yaml(self):
         try:
-            # Validate core objects exist
+            
             if not self.yaml_property_editor:
                 print("Error: Property editor not initialized")
                 return
             
-            # Safe text retrieval
+            
             current_name = (self.yaml_property_editor.name_edit.text() or '').strip()
             current_path = (self.yaml_property_editor.path_edit.text() or '').strip()
             
-            # Ensure YAML content is a dictionary
+       
             if not isinstance(self.yaml_content, dict):
                 try:
-                    # Convert to dict if not already
+                    
                     self.yaml_content = yaml.safe_load(str(self.yaml_content)) or {}
                 except Exception as parse_error:
                     print(f"YAML parsing error: {parse_error}")
                     self.yaml_content = {}
             
-            # Safe updates with null checks
             if current_name:
                 self.yaml_content['Name'] = current_name
             
@@ -822,17 +819,14 @@ class MainWindow(QMainWindow):
             self.yaml_content['Loop'] = self.yaml_property_editor.loop_checkbox.isChecked()
             self.yaml_content['FrameCount'] = self.yaml_property_editor.frame_count_spin.value()
             
-            # Safe material config update
             if self.yaml_content.get('MaterialAnimConfigs'):
                 for material in self.yaml_content['MaterialAnimConfigs']:
                     if material and material.get('TexturePatternInfos'):
                         material['TexturePatternInfos'][0]['IsConstant'] = \
                             self.yaml_property_editor.is_constant_checkbox.isChecked()
             
-            # Convert to YAML string
             yaml_content = yaml.dump(self.yaml_content, sort_keys=False, allow_unicode=True)
             
-            # Trigger update
             if hasattr(self.yaml_property_editor, 'trigger_yaml_update'):
                 self.yaml_property_editor.trigger_yaml_update()
         
@@ -841,7 +835,6 @@ class MainWindow(QMainWindow):
 
 
 
-# Property editor
 
 class YAMLPropertyEditor(QWidget):
     def __init__(self, parent: 'MainWindow' = None):  # Type-Annotation in Anführungszeichen
@@ -853,7 +846,6 @@ class YAMLPropertyEditor(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout()
         
-        # Basic properties group
         basic_group = QGroupBox("Basic Properties")
         basic_layout = QFormLayout()
         
@@ -877,7 +869,6 @@ class YAMLPropertyEditor(QWidget):
         basic_group.setLayout(basic_layout)
         layout.addWidget(basic_group)
         
-        # Materials group
         materials_group = QGroupBox("Material Configs")
         materials_layout = QVBoxLayout()
         
@@ -885,14 +876,12 @@ class YAMLPropertyEditor(QWidget):
         self.materials_list.currentItemChanged.connect(self.on_material_selected)
         materials_layout.addWidget(self.materials_list)
         
-        # Material properties
         material_form = QFormLayout()
         self.material_name_edit = QLineEdit()
         self.material_name_edit.setEnabled(False)
         self.material_name_edit.textChanged.connect(self.update_material_property)
         material_form.addRow("Material Name:", self.material_name_edit)
         
-        # TexturePatternInfo properties
         self.is_constant_checkbox = QCheckBox()
         self.is_constant_checkbox.stateChanged.connect(self.update_yaml)
         material_form.addRow("Is Constant:", self.is_constant_checkbox)
@@ -906,7 +895,7 @@ class YAMLPropertyEditor(QWidget):
     def load_yaml_content(self, yaml_content):
         try:
             self.yaml_content = yaml.safe_load(yaml_content) if yaml_content else {
-                'Name': '',  # Change default to empty string
+                'Name': '', 
                 'Path': None,
                 'Loop': False,
                 'FrameCount': 1,
@@ -934,11 +923,9 @@ class YAMLPropertyEditor(QWidget):
         if not self.yaml_content:
             return
         
-        # Use get() with empty string as default to ensure any parsed name is used
         self.name_edit.setText(self.yaml_content.get('Name', ''))
 
             
-        # Calculate frame count from animation frames if available
         if 'MaterialAnimConfigs' in self.yaml_content and self.yaml_content['MaterialAnimConfigs']:
             for material in self.yaml_content['MaterialAnimConfigs']:
                 if material.get('TexturePatternInfos'):
